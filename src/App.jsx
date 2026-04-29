@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  WifiOff, Printer, Bug, Key, Monitor, HelpCircle, 
-  Clock, CheckCircle, AlertCircle, ArrowRight, LogOut
-} from 'lucide-react';
+import { WifiOff, Printer, Bug, Key, Monitor, HelpCircle, Clock, CheckCircle, AlertCircle, ArrowRight, LogOut } from 'lucide-react';
+
+const API_URL = 'http://localhost:5000/api';
 
 const COMMON_ISSUES = [
   { id: 'network', title: 'No Internet', icon: WifiOff, color: 'text-red-500', bg: 'bg-red-50', priority: 'High' },
@@ -19,50 +18,77 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [details, setDetails] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tickets, setTickets] = useState([
-    { id: 'TKT-1042', category: 'Printer Issue', details: 'Paper jam on floor 2', status: 'In Progress', date: '2026-04-28' },
-    { id: 'TKT-1039', category: 'Password Reset', details: 'Locked out of email', status: 'Resolved', date: '2026-04-25' },
-  ]);
+  const [tickets, setTickets] = useState([]);
 
+  // Check persistent login and fetch tickets
   useEffect(() => {
-    const savedSession = localStorage.getItem('pillar5_session');
-    if (savedSession) {
+    const savedUser = localStorage.getItem('pillar5_user');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
       setIsAuthenticated(true);
-      setUser({ name: 'Alex Developer', role: 'Employee' });
+      setUser(parsedUser);
+      fetchTickets(parsedUser.id);
     }
   }, []);
 
-  const handleLogin = () => {
-    localStorage.setItem('pillar5_session', 'active');
-    setIsAuthenticated(true);
-    setUser({ name: 'Alex Developer', role: 'Employee' });
+  const fetchTickets = async (userId) => {
+    try {
+      const response = await fetch(`${API_URL}/tickets/${userId}`);
+      const data = await response.json();
+      setTickets(data);
+    } catch (error) {
+      console.error("Error fetching tickets:", error);
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      const response = await fetch(`${API_URL}/login`, { method: 'POST' });
+      const userData = await response.json();
+      localStorage.setItem('pillar5_user', JSON.stringify(userData));
+      setIsAuthenticated(true);
+      setUser(userData);
+      fetchTickets(userData.id);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('pillar5_session');
+    localStorage.removeItem('pillar5_user');
     setIsAuthenticated(false);
     setUser(null);
+    setTickets([]);
     setSelectedCategory(null);
     setDetails('');
   };
 
-  const handleSubmitTicket = (e) => {
+  const handleSubmitTicket = async (e) => {
     e.preventDefault();
-    if (!selectedCategory) return;
+    if (!selectedCategory || !user) return;
     setIsSubmitting(true);
-    setTimeout(() => {
-      const newTicket = {
-        id: `TKT-${Math.floor(Math.random() * 9000) + 1000}`,
-        category: selectedCategory.title,
-        details: details || 'No additional details provided.',
-        status: 'Open',
-        date: new Date().toISOString().split('T')[0],
-      };
-      setTickets([newTicket, ...tickets]);
+
+    try {
+      const response = await fetch(`${API_URL}/tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          category: selectedCategory.title,
+          details: details,
+          priority: selectedCategory.priority
+        })
+      });
+      
+      const newTicket = await response.json();
+      setTickets([newTicket, ...tickets]); // Update UI instantly
       setSelectedCategory(null);
       setDetails('');
+    } catch (error) {
+      console.error("Error submitting ticket:", error);
+    } finally {
       setIsSubmitting(false);
-    }, 800);
+    }
   };
 
   const getStatusIcon = (status) => {
@@ -84,8 +110,7 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white max-w-md w-full rounded-2xl shadow-xl overflow-hidden border border-slate-100">
-          <div className="p-8 text-center">
+        <div className="bg-white max-w-md w-full rounded-2xl shadow-xl overflow-hidden border border-slate-100 p-8 text-center">
             <div className="w-16 h-16 bg-blue-600 rounded-xl mx-auto flex items-center justify-center mb-6 shadow-lg">
               <span className="text-white font-bold text-2xl">P5</span>
             </div>
@@ -94,7 +119,6 @@ export default function App() {
             <button onClick={handleLogin} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2">
               Sign In with Company SSO <ArrowRight className="w-4 h-4" />
             </button>
-          </div>
         </div>
       </div>
     );
@@ -177,12 +201,14 @@ export default function App() {
                   tickets.map((ticket) => (
                     <div key={ticket.id} className="p-5 hover:bg-slate-50 transition-colors group cursor-pointer">
                       <div className="flex justify-between items-start mb-2">
-                        <span className="text-xs font-medium text-slate-400 font-mono">{ticket.id}</span>
+                        <span className="text-xs font-medium text-slate-400 font-mono">{ticket.ticket_ref}</span>
                         <span className={`text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 ${getStatusBadge(ticket.status)}`}>{getStatusIcon(ticket.status)} {ticket.status}</span>
                       </div>
                       <h4 className="font-semibold text-slate-800 text-sm mb-1">{ticket.category}</h4>
                       <p className="text-xs text-slate-500 line-clamp-1 mb-2">{ticket.details}</p>
-                      <div className="text-[11px] text-slate-400 font-medium">Submitted: {ticket.date}</div>
+                      <div className="text-[11px] text-slate-400 font-medium">
+                        Submitted: {new Date(ticket.created_at).toLocaleDateString()}
+                      </div>
                     </div>
                   ))
                 )}
