@@ -24,7 +24,7 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const handleLoginSubmit = async (e) => {
+const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setLoginError('');
     try {
@@ -35,19 +35,28 @@ export default function App() {
       });
       
       if (response.ok) {
-        const userData = await response.json();
+        // 1. Correctly define the variable as 'data'
+        const data = await response.json(); 
+        
+        // 2. Now data.token works perfectly
+        localStorage.setItem('pillar5_token', data.token); 
         setIsAuthenticated(true);
-        setUser(userData);
+        
+        // 3. Drill down into data.user so the dashboard gets the right info
+        setUser(data.user); 
       } else {
         const errorData = await response.json();
         setLoginError(errorData.message || "Login failed");
       }
     } catch (error) {
-      setLoginError("Server error. Is the backend running?");
+      // Log the actual error to the console so it's easier to debug in the future
+      console.error("Frontend Crash:", error); 
+      setLoginError("Application error. Please check the browser console.");
     }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('pillar5_token'); // Destroy token
     setIsAuthenticated(false);
     setUser(null);
     setLoginEmail('');
@@ -157,14 +166,20 @@ function AdminDashboard({ user }) {
 
   const fetchAdminTickets = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/tickets`, { headers: { 'x-user-id': user.id } });
+      // UPDATED: Now uses the secure JWT token instead of x-user-id
+      const res = await fetch(`${API_URL}/admin/tickets`, { 
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('pillar5_token')}` } 
+      });
       setTickets(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const fetchTechs = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/techs`, { headers: { 'x-user-id': user.id } });
+      // UPDATED: Now uses the secure JWT token instead of x-user-id
+      const res = await fetch(`${API_URL}/admin/techs`, { 
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('pillar5_token')}` } 
+      });
       setTechs(await res.json());
     } catch (err) { console.error(err); }
   };
@@ -185,9 +200,13 @@ function AdminDashboard({ user }) {
   const handleTicketUpdate = async (field, value, actionMessage) => {
     const updatedTicket = { ...selectedTicket, [field]: value };
     try {
+      // UPDATED: Now uses the secure JWT token and includes Content-Type
       await fetch(`${API_URL}/tickets/${selectedTicket.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${localStorage.getItem('pillar5_token')}` 
+        },
         body: JSON.stringify({ 
           status: updatedTicket.status, 
           priority: updatedTicket.priority, 
