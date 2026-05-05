@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   WifiOff, Printer, Bug, Key, Monitor, HelpCircle, 
-  Clock, CheckCircle, AlertCircle, ArrowRight, LogOut, MessageSquare, ShieldAlert
+  Clock, CheckCircle, AlertCircle, ArrowRight, LogOut, MessageSquare, ShieldAlert, Activity
 } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
@@ -18,67 +18,98 @@ const COMMON_ISSUES = [
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  
+  // Login Form State
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
-  // Check persistent login
-  useEffect(() => {
-    const savedUser = localStorage.getItem('pillar5_user');
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setIsAuthenticated(true);
-      setUser(parsedUser);
-    }
-  }, []);
-
-  const handleLogin = async (email) => {
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoginError('');
     try {
       const response = await fetch(`${API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
       });
-      const userData = await response.json();
-      localStorage.setItem('pillar5_user', JSON.stringify(userData));
-      setIsAuthenticated(true);
-      setUser(userData);
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setIsAuthenticated(true);
+        setUser(userData);
+      } else {
+        const errorData = await response.json();
+        setLoginError(errorData.message || "Login failed");
+      }
     } catch (error) {
-      console.error("Login failed:", error);
+      setLoginError("Server error. Is the backend running?");
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('pillar5_user');
     setIsAuthenticated(false);
     setUser(null);
+    setLoginEmail('');
+    setLoginPassword('');
   };
 
-  // --- LOGIN SCREEN ---
+  // --- LOGIN SCREEN WITH FORM ---
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white max-w-md w-full rounded-2xl shadow-xl overflow-hidden border border-slate-100 p-8 text-center">
-            <div className="w-16 h-16 bg-blue-600 rounded-xl mx-auto flex items-center justify-center mb-6 shadow-lg">
-              <span className="text-white font-bold text-2xl">P5</span>
+        <div className="bg-white max-w-md w-full rounded-2xl shadow-xl overflow-hidden border border-slate-100 p-8">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-blue-600 rounded-xl mx-auto flex items-center justify-center mb-4 shadow-lg">
+                <span className="text-white font-bold text-2xl">P5</span>
+              </div>
+              <h1 className="text-2xl font-bold text-slate-800 mb-1">Pillar 5 Portal</h1>
+              <p className="text-slate-500 text-sm">Sign in to access the system</p>
             </div>
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">Pillar 5 Portal</h1>
-            <p className="text-slate-500 mb-8">Select your role to continue.</p>
             
-            <div className="space-y-3">
-              <button onClick={() => handleLogin('luyanda@pillar5.com')} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-4 rounded-xl transition-all flex items-center justify-between">
-                <span>Log in as Employee</span> <ArrowRight className="w-4 h-4" />
+            {loginError && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 text-center">{loginError}</div>}
+            
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                <input 
+                  type="email" 
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full rounded-xl border-slate-300 focus:border-blue-500 focus:ring-blue-500 p-2.5 border bg-slate-50" 
+                  placeholder="name@pillar5.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                <input 
+                  type="password" 
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full rounded-xl border-slate-300 focus:border-blue-500 focus:ring-blue-500 p-2.5 border bg-slate-50" 
+                  placeholder="••••••••"
+                />
+              </div>
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 mt-2">
+                Sign In <ArrowRight className="w-4 h-4" />
               </button>
-              <button onClick={() => handleLogin('admin@pillar5.com')} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-3 px-4 rounded-xl transition-all flex items-center justify-between">
-                <span>Log in as Tech Admin</span> <ShieldAlert className="w-4 h-4" />
-              </button>
+            </form>
+            
+            <div className="mt-6 text-xs text-center text-slate-400 border-t pt-4">
+              <p>Test Accounts:</p>
+              <p>luyanda@pillar5.com / password123</p>
+              <p>admin@pillar5.com / password123</p>
             </div>
         </div>
       </div>
     );
   }
 
-  // --- ROUTER: DIRECT TO CORRECT DASHBOARD ---
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm flex-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
@@ -107,45 +138,69 @@ export default function App() {
 }
 
 // ==========================================
-// ADMIN DASHBOARD COMPONENT (PHASE 2)
+// ADMIN DASHBOARD COMPONENT
 // ==========================================
 function AdminDashboard({ user }) {
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [comments, setComments] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [techs, setTechs] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
+  const [activeTab, setActiveTab] = useState('comments'); // 'comments' or 'logs'
 
   useEffect(() => {
     fetchAdminTickets();
+    fetchTechs();
   }, []);
 
   const fetchAdminTickets = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/tickets`);
-      const data = await res.json();
-      setTickets(data);
+      const res = await fetch(`${API_URL}/admin/tickets`, { headers: { 'x-user-id': user.id } });
+      setTickets(await res.json());
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchTechs = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/techs`, { headers: { 'x-user-id': user.id } });
+      setTechs(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const handleTicketSelect = async (ticket) => {
     setSelectedTicket(ticket);
+    setActiveTab('comments');
     try {
-      const res = await fetch(`${API_URL}/tickets/${ticket.id}/comments`);
-      const data = await res.json();
-      setComments(data);
+      // Fetch Comments
+      const resComments = await fetch(`${API_URL}/tickets/${ticket.id}/comments`);
+      setComments(await resComments.json());
+      // Fetch Logs
+      const resLogs = await fetch(`${API_URL}/tickets/${ticket.id}/logs`);
+      setLogs(await resLogs.json());
     } catch (err) { console.error(err); }
   };
 
-  const handleStatusChange = async (newStatus) => {
+  const handleTicketUpdate = async (field, value, actionMessage) => {
+    const updatedTicket = { ...selectedTicket, [field]: value };
     try {
       await fetch(`${API_URL}/tickets/${selectedTicket.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, priority: selectedTicket.priority, assigned_to: user.id })
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user.id },
+        body: JSON.stringify({ 
+          status: updatedTicket.status, 
+          priority: updatedTicket.priority, 
+          assigned_to: updatedTicket.assigned_to,
+          user_name: user.name,
+          action_description: actionMessage
+        })
       });
-      setSelectedTicket({ ...selectedTicket, status: newStatus });
-      fetchAdminTickets(); // Refresh master list
+      setSelectedTicket(updatedTicket);
+      fetchAdminTickets(); // Refresh Master Queue
+      // Refresh Logs
+      const resLogs = await fetch(`${API_URL}/tickets/${selectedTicket.id}/logs`);
+      setLogs(await resLogs.json());
     } catch (err) { console.error(err); }
   };
 
@@ -167,109 +222,149 @@ function AdminDashboard({ user }) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-4rem)]">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         
         {/* LEFT COLUMN: Master Queue */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[80vh]">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[calc(100vh-8rem)]">
           <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-            <h2 className="font-bold text-slate-800">Master Queue</h2>
-            <span className="text-xs font-semibold bg-slate-200 text-slate-600 px-2 py-1 rounded-full">{tickets.length} Active</span>
+            <h2 className="font-bold text-slate-800">Triage Queue</h2>
           </div>
           <div className="overflow-y-auto flex-1 p-2 space-y-2">
             {tickets.map(t => (
               <div 
-                key={t.id} 
-                onClick={() => handleTicketSelect(t)}
+                key={t.id} onClick={() => handleTicketSelect(t)}
                 className={`p-4 rounded-xl cursor-pointer border transition-all ${selectedTicket?.id === t.id ? 'border-slate-800 bg-slate-800 text-white shadow-md' : 'border-slate-100 hover:border-slate-300 bg-white text-slate-800 hover:shadow-sm'}`}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <span className={`text-xs font-mono ${selectedTicket?.id === t.id ? 'text-slate-300' : 'text-slate-500'}`}>{t.ticket_ref}</span>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm ${t.status === 'Open' ? 'bg-orange-100 text-orange-700' : t.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {t.status}
-                  </span>
+                  <span className="text-xs font-mono opacity-70">{t.ticket_ref}</span>
+                  <div className="flex gap-1">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm ${t.priority === 'High' || t.priority === 'Critical' ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-700'}`}>{t.priority}</span>
+                  </div>
                 </div>
                 <h3 className="font-bold text-sm mb-1">{t.category}</h3>
-                <p className={`text-xs line-clamp-1 ${selectedTicket?.id === t.id ? 'text-slate-400' : 'text-slate-500'}`}>From: {t.requester_name}</p>
+                <p className="text-xs opacity-70 line-clamp-1">From: {t.requester_name}</p>
               </div>
             ))}
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Ticket Details & Action Center */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[80vh]">
+        {/* RIGHT COLUMN: Action Center */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[calc(100vh-8rem)] overflow-hidden">
           {!selectedTicket ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-              <MessageSquare className="w-12 h-12 mb-4 opacity-50" />
-              <p>Select a ticket from the queue to view details.</p>
+              <ShieldAlert className="w-12 h-12 mb-4 opacity-50" />
+              <p>Select a ticket to begin triage.</p>
             </div>
           ) : (
             <>
-              {/* Ticket Header & Controls */}
-              <div className="p-6 border-b border-slate-200">
+              {/* Ticket Controls Header */}
+              <div className="p-6 border-b border-slate-200 bg-slate-50">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-800 mb-2">{selectedTicket.category}</h2>
-                    <p className="text-sm text-slate-600">Reported by <span className="font-semibold">{selectedTicket.requester_name}</span> on {new Date(selectedTicket.created_at).toLocaleDateString()}</p>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-1">{selectedTicket.category}</h2>
+                    <p className="text-sm text-slate-600">Reported by <span className="font-semibold">{selectedTicket.requester_name}</span></p>
                   </div>
-                  <select 
-                    value={selectedTicket.status} 
-                    onChange={(e) => handleStatusChange(e.target.value)}
-                    className="border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-slate-50 focus:ring-slate-800 focus:border-slate-800"
-                  >
-                    <option value="Open">Status: Open</option>
-                    <option value="In Progress">Status: In Progress</option>
-                    <option value="Waiting on User">Status: Waiting on User</option>
-                    <option value="Resolved">Status: Resolved</option>
-                  </select>
+                  
+                  {/* Dropdown Controls */}
+                  <div className="flex gap-2">
+                    <select 
+                      value={selectedTicket.priority} 
+                      onChange={(e) => handleTicketUpdate('priority', e.target.value, `Escalated priority to ${e.target.value}`)}
+                      className="border-slate-300 rounded-lg text-xs font-medium focus:ring-slate-800"
+                    >
+                      <option value="Low">Low Priority</option>
+                      <option value="Medium">Medium Priority</option>
+                      <option value="High">High Priority</option>
+                      <option value="Critical">CRITICAL</option>
+                    </select>
+
+                    <select 
+                      value={selectedTicket.assigned_to || ""} 
+                      onChange={(e) => handleTicketUpdate('assigned_to', e.target.value, `Assigned ticket to a technician`)}
+                      className="border-slate-300 rounded-lg text-xs font-medium focus:ring-slate-800"
+                    >
+                      <option value="">Unassigned</option>
+                      {techs.map(tech => <option key={tech.id} value={tech.id}>{tech.name}</option>)}
+                    </select>
+
+                    <select 
+                      value={selectedTicket.status} 
+                      onChange={(e) => handleTicketUpdate('status', e.target.value, `Changed status to ${e.target.value}`)}
+                      className="border-slate-300 rounded-lg text-xs font-bold bg-slate-800 text-white focus:ring-slate-800"
+                    >
+                      <option value="Open">Status: Open</option>
+                      <option value="In Progress">Status: In Progress</option>
+                      <option value="Waiting on User">Status: Waiting on User</option>
+                      <option value="Resolved">Status: Resolved</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-700">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 text-sm text-slate-700 shadow-sm">
                   {selectedTicket.details}
                 </div>
               </div>
 
-              {/* Chat / Comments Section */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
-                {comments.length === 0 ? (
-                  <p className="text-center text-slate-400 text-sm">No activity on this ticket yet.</p>
+              {/* Tabs */}
+              <div className="flex border-b border-slate-200 bg-white">
+                <button onClick={() => setActiveTab('comments')} className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Communication</button>
+                <button onClick={() => setActiveTab('logs')} className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'logs' ? 'border-slate-800 text-slate-800' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+                  <Activity className="w-4 h-4" /> Audit Logs
+                </button>
+              </div>
+
+              {/* Content Area */}
+              <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                {activeTab === 'comments' ? (
+                  <div className="space-y-4">
+                    {comments.length === 0 ? <p className="text-center text-slate-400 text-sm mt-10">No comments yet.</p> : 
+                      comments.map(c => (
+                        <div key={c.id} className={`p-4 rounded-xl max-w-[85%] ${c.is_internal ? 'bg-amber-50 border border-amber-200' : c.author_role === 'Admin' ? 'bg-slate-800 text-white ml-auto' : 'bg-white border border-slate-200'}`}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-bold">{c.author_name} {c.is_internal && <span className="ml-2 bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-[10px]">INTERNAL NOTE</span>}</span>
+                            <span className="text-[10px] opacity-60">{new Date(c.created_at).toLocaleString()}</span>
+                          </div>
+                          <p className="text-sm opacity-90">{c.content}</p>
+                        </div>
+                      ))
+                    }
+                  </div>
                 ) : (
-                  comments.map(c => (
-                    <div key={c.id} className={`p-4 rounded-xl max-w-[85%] ${c.is_internal ? 'bg-amber-50 border border-amber-200' : c.author_role === 'Admin' ? 'bg-slate-800 text-white ml-auto' : 'bg-white border border-slate-200'}`}>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className={`text-xs font-bold ${c.author_role === 'Admin' && !c.is_internal ? 'text-slate-300' : 'text-slate-800'}`}>
-                          {c.author_name} {c.is_internal && <span className="ml-2 bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-[10px] uppercase">Internal Note</span>}
-                        </span>
-                        <span className={`text-[10px] ${c.author_role === 'Admin' && !c.is_internal ? 'text-slate-400' : 'text-slate-400'}`}>
-                          {new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </span>
-                      </div>
-                      <p className={`text-sm ${c.author_role === 'Admin' && !c.is_internal ? 'text-slate-200' : 'text-slate-600'}`}>{c.content}</p>
-                    </div>
-                  ))
+                  <div className="space-y-3">
+                    {logs.length === 0 ? <p className="text-center text-slate-400 text-sm mt-10">No activity recorded.</p> : 
+                      logs.map(log => (
+                        <div key={log.id} className="flex gap-4 items-start text-sm">
+                          <div className="w-2 h-2 rounded-full bg-slate-300 mt-1.5 flex-none"></div>
+                          <div>
+                            <p className="text-slate-800"><span className="font-semibold">{log.user_name}</span> {log.action}</p>
+                            <p className="text-[10px] text-slate-400">{new Date(log.created_at).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
                 )}
               </div>
 
-              {/* Input Area */}
-              <div className="p-4 border-t border-slate-200 bg-white">
-                <form onSubmit={handleCommentSubmit} className="space-y-3">
-                  <textarea 
-                    rows={2} 
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Type an update or internal note..." 
-                    className="w-full rounded-xl border-slate-300 focus:border-slate-800 focus:ring-slate-800 text-sm p-3"
-                  />
-                  <div className="flex justify-between items-center">
-                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                      <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} className="rounded text-amber-500 focus:ring-amber-500" />
-                      Make this an Internal Note (hidden from user)
-                    </label>
-                    <button type="submit" className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">
-                      Post Update
-                    </button>
-                  </div>
-                </form>
-              </div>
+              {/* Comment Input Box */}
+              {activeTab === 'comments' && (
+                <div className="p-4 border-t border-slate-200 bg-white">
+                  <form onSubmit={handleCommentSubmit} className="space-y-3">
+                    <textarea 
+                      rows={2} value={newComment} onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Type an update or internal note..." 
+                      className="w-full rounded-xl border-slate-300 focus:border-slate-800 text-sm p-3 bg-slate-50"
+                    />
+                    <div className="flex justify-between items-center">
+                      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                        <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} className="rounded text-amber-500 focus:ring-amber-500" />
+                        Internal Note (Hidden from employee)
+                      </label>
+                      <button type="submit" className="bg-slate-800 text-white px-6 py-2 rounded-lg text-sm font-medium">Post Update</button>
+                    </div>
+                  </form>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -279,21 +374,35 @@ function AdminDashboard({ user }) {
 }
 
 // ==========================================
-// EMPLOYEE DASHBOARD COMPONENT (PHASE 1)
+// EMPLOYEE DASHBOARD COMPONENT
 // ==========================================
 function EmployeeDashboard({ user }) {
+  const [tickets, setTickets] = useState([]);
+  const [selectedTicket, setSelectedTicket] = useState(null); // Determines if we are chatting or submitting
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [details, setDetails] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tickets, setTickets] = useState([]);
+  
+  // Chat state
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
 
-  useEffect(() => { fetchTickets(user.id); }, [user.id]);
+  useEffect(() => { fetchTickets(); }, []);
 
-  const fetchTickets = async (userId) => {
+  const fetchTickets = async () => {
     try {
-      const res = await fetch(`${API_URL}/tickets/${userId}`);
+      const res = await fetch(`${API_URL}/tickets/${user.id}`);
+      setTickets(await res.json());
+    } catch (err) { console.error(err); }
+  };
+
+  const handleTicketSelect = async (ticket) => {
+    setSelectedTicket(ticket);
+    try {
+      const res = await fetch(`${API_URL}/tickets/${ticket.id}/comments`);
       const data = await res.json();
-      setTickets(data);
+      // Employees ONLY see public comments!
+      setComments(data.filter(c => !c.is_internal));
     } catch (err) { console.error(err); }
   };
 
@@ -307,72 +416,131 @@ function EmployeeDashboard({ user }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, category: selectedCategory.title, details, priority: selectedCategory.priority })
       });
-      const newTicket = await res.json();
-      setTickets([newTicket, ...tickets]);
+      fetchTickets(); // Refresh list
       setSelectedCategory(null);
       setDetails('');
     } catch (err) { console.error(err); } finally { setIsSubmitting(false); }
   };
 
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+
+    try {
+      const res = await fetch(`${API_URL}/tickets/${selectedTicket.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, content: newComment, isInternal: false })
+      });
+      const commentData = await res.json();
+      setComments([...comments, commentData]);
+      setNewComment('');
+    } catch (err) { console.error(err); }
+  };
+
   return (
-    <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Col: Submission form */}
-        <div className="lg:col-span-2 space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800 mb-1">What do you need help with?</h2>
-            <p className="text-slate-500 text-sm mb-6">Select a category below to log an issue instantly.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {COMMON_ISSUES.map((issue) => {
-                const isSelected = selectedCategory?.id === issue.id;
-                const Icon = issue.icon;
-                return (
-                  <button key={issue.id} onClick={() => setSelectedCategory(issue)} className={`relative flex flex-col items-center justify-center p-6 rounded-2xl transition-all duration-200 border-2 text-center group ${isSelected ? 'border-blue-500 bg-blue-50 shadow-md ring-4 ring-blue-500/10' : 'border-slate-100 bg-white hover:border-slate-300 hover:shadow-sm'}`}>
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-transform duration-200 group-hover:scale-110 ${issue.bg}`}>
-                      <Icon className={`w-6 h-6 ${issue.color}`} />
-                    </div>
-                    <span className={`font-medium text-sm ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>{issue.title}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          {selectedCategory && (
-            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-              <form onSubmit={handleSubmitTicket}>
-                <textarea rows={3} placeholder="Where are you located? Are there any error messages? (Optional)" className="w-full rounded-xl border-slate-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-3 border bg-slate-50 transition-colors" value={details} onChange={(e) => setDetails(e.target.value)} />
-                <div className="mt-4 flex justify-end gap-3">
-                  <button type="button" onClick={() => { setSelectedCategory(null); setDetails(''); }} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-                  <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-all shadow-sm flex items-center gap-2">
-                    {isSubmitting ? 'Submitting...' : 'Submit Ticket'} {!isSubmitting && <ArrowRight className="w-4 h-4" />}
-                  </button>
+    <div className="max-w-6xl mx-auto w-full px-4 py-8 flex-1 flex flex-col h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 min-h-0">
+        
+        {/* LEFT COLUMN: Main Interaction Area */}
+        <div className="lg:col-span-2 flex flex-col h-[calc(100vh-8rem)]">
+          {!selectedTicket ? (
+            // SUBMIT NEW TICKET VIEW
+            <div className="space-y-6 overflow-y-auto pr-2">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800 mb-1">Need Help?</h2>
+                <p className="text-slate-500 text-sm mb-6">Select a category to log an issue instantly.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {COMMON_ISSUES.map((issue) => {
+                    const isSelected = selectedCategory?.id === issue.id;
+                    const Icon = issue.icon;
+                    return (
+                      <button key={issue.id} onClick={() => setSelectedCategory(issue)} className={`relative flex flex-col items-center justify-center p-6 rounded-2xl transition-all border-2 group ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white hover:border-slate-300'}`}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${issue.bg}`}>
+                          <Icon className={`w-6 h-6 ${issue.color}`} />
+                        </div>
+                        <span className={`font-medium text-sm ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>{issue.title}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </form>
+              </div>
+              {selectedCategory && (
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm animate-in slide-in-from-top-4">
+                  <form onSubmit={handleSubmitTicket}>
+                    <textarea rows={3} placeholder="Provide details (Room number, error messages, etc)..." className="w-full rounded-xl border-slate-200 focus:border-blue-500 text-sm p-3 border bg-slate-50" value={details} onChange={(e) => setDetails(e.target.value)} />
+                    <div className="mt-4 flex justify-end gap-3">
+                      <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl shadow-sm flex items-center gap-2">
+                        {isSubmitting ? 'Submitting...' : 'Submit Ticket'} <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          ) : (
+            // EMPLOYEE TICKET CHAT VIEW
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+              <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <div>
+                  <h2 className="font-bold text-slate-800 text-lg">{selectedTicket.category}</h2>
+                  <span className="text-xs text-slate-500 font-mono">{selectedTicket.ticket_ref} • Status: {selectedTicket.status}</span>
+                </div>
+                <button onClick={() => setSelectedTicket(null)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-medium transition-colors">
+                  + New Ticket
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
+                <div className="p-4 rounded-xl bg-white border border-slate-200 text-sm text-slate-600 mb-6">
+                  <strong>Original Report:</strong> {selectedTicket.details}
+                </div>
+
+                {comments.length === 0 ? <p className="text-center text-slate-400 text-sm mt-10">Waiting for a response from IT...</p> : 
+                  comments.map(c => (
+                    <div key={c.id} className={`p-4 rounded-xl max-w-[85%] ${c.author_role === 'Employee' ? 'bg-blue-600 text-white ml-auto' : 'bg-white border border-slate-200'}`}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold opacity-90">{c.author_name}</span>
+                        <span className="text-[10px] opacity-60">{new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      </div>
+                      <p className="text-sm opacity-90">{c.content}</p>
+                    </div>
+                  ))
+                }
+              </div>
+
+              <div className="p-4 border-t border-slate-200 bg-white">
+                <form onSubmit={handleCommentSubmit} className="flex gap-2">
+                  <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Reply to IT support..." className="flex-1 rounded-xl border-slate-300 focus:border-blue-500 text-sm bg-slate-50" />
+                  <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-medium">Send</button>
+                </form>
+              </div>
             </div>
           )}
         </div>
         
-        {/* Right Col: Recent Tickets */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">
-            <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-              <h2 className="font-bold text-slate-800">My Recent Tickets</h2>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {tickets.length === 0 ? <div className="p-8 text-center text-slate-500 text-sm">No recent tickets.</div> : tickets.map((t) => (
-                <div key={t.id} className="p-5 hover:bg-slate-50">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-medium text-slate-400 font-mono">{t.ticket_ref}</span>
-                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-slate-100">{t.status}</span>
-                  </div>
-                  <h4 className="font-semibold text-slate-800 text-sm mb-1">{t.category}</h4>
-                  <p className="text-xs text-slate-500 line-clamp-1">{t.details}</p>
+        {/* RIGHT COLUMN: Recent Tickets Navigation */}
+        <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[calc(100vh-8rem)]">
+          <div className="p-4 border-b border-slate-200 bg-slate-50">
+            <h2 className="font-bold text-slate-800">My Requests</h2>
+          </div>
+          <div className="overflow-y-auto flex-1 p-2 space-y-2">
+            {tickets.length === 0 ? <div className="p-8 text-center text-slate-500 text-sm">No recent tickets.</div> : tickets.map((t) => (
+              <div 
+                key={t.id} 
+                onClick={() => handleTicketSelect(t)}
+                className={`p-4 rounded-xl cursor-pointer border transition-colors ${selectedTicket?.id === t.id ? 'bg-blue-50 border-blue-200 shadow-sm' : 'hover:bg-slate-50 border-transparent border-b-slate-100'}`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-medium text-slate-400 font-mono">{t.ticket_ref}</span>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm ${t.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>{t.status}</span>
                 </div>
-              ))}
-            </div>
+                <h4 className="font-semibold text-slate-800 text-sm mb-1">{t.category}</h4>
+              </div>
+            ))}
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

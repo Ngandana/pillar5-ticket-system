@@ -18,15 +18,23 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-// 1. Mock Login Route (Updated for Phase 2)
+/// 1. Login Route (Now with Password Verification)
 app.post('/api/login', async (req, res) => {
-    const { email } = req.body;
     try {
-        const [rows] = await pool.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password required" });
+        }
+        
+        // Check for BOTH email and password matching
+        const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND password = ? LIMIT 1', [email, password]);
+        
         if (rows.length > 0) {
-            res.json(rows[0]);
+            // Remove the password from the data before sending it to the React frontend
+            const { password, ...userWithoutPassword } = rows[0];
+            res.json(userWithoutPassword);
         } else {
-            res.status(404).json({ message: "User not found" });
+            res.status(401).json({ message: "Invalid email or password" });
         }
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -71,18 +79,36 @@ app.listen(PORT, () => {
 });
 
 // ==========================================
+// SECURITY MIDDLEWARE
+// ==========================================
+const verifyAdmin = async (req, res, next) => {
+    const userId = req.headers['x-user-id'];
+    
+    if (!userId) {
+        return res.status(401).json({ message: "Unauthorized: No user ID provided" });
+    }
+
+    try {
+        const [rows] = await pool.query('SELECT role FROM users WHERE id = ?', [userId]);
+        if (rows.length > 0 && rows[0].role === 'Admin') {
+            next(); // User is an admin, allow the request to proceed
+        } else {
+            res.status(403).json({ message: "Forbidden: Admin access required" });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// ==========================================
 // ADMIN & TECH TEAM ROUTES (PHASE 2)
 // ==========================================
 
-// 4. Get ALL Tickets (Master Queue for Admins)
-app.get('/api/admin/tickets', async (req, res) => {
+// 4. Get ALL Tickets (Master Queue for Admins) - NOW PROTECTED
+app.get('/api/admin/tickets', verifyAdmin, async (req, res) => {
     try {
-        // We use JOINs here to grab the actual names of the requester and the assigned tech, 
-        // rather than just their ID numbers.
         const query = `
-            SELECT t.*, 
-                   u.name as requester_name, 
-                   a.name as assignee_name 
+            SELECT t.*, u.name as requester_name, a.name as assignee_name 
             FROM tickets t 
             JOIN users u ON t.user_id = u.id 
             LEFT JOIN users a ON t.assigned_to = a.id 
@@ -95,17 +121,37 @@ app.get('/api/admin/tickets', async (req, res) => {
     }
 });
 
-// 5. Update Ticket (Change Status, Priority, or Assignee)
-app.put('/api/tickets/:id', async (req, res) => {
+// 5. Update Ticket (Status, Priority, Assignee) + Audit Logging
+app.put('/api/tickets/:id', verifyAdmin, async (req, res) => {
     const ticketId = req.params.id;
-    const { status, priority, assigned_to } = req.body;
+    const { status, priority, assigned_to, user_name, action_description } = req.body;
 
     try {
+        // 1. Update the ticket
         await pool.query(
             'UPDATE tickets SET status = ?, priority = ?, assigned_to = ? WHERE id = ?',
-            [status, priority, assigned_to, ticketId]
+            [status, priority, assigned_to || null, ticketId]
         );
+        
+        // 2. Log the activity automatically
+        if (action_description) {
+            await pool.query(
+                'INSERT INTO activity_logs (ticket_id, user_name, action) VALUES (?, ?, ?)',
+                [ticketId, user_name, action_description]
+            );
+        }
+        
         res.json({ message: "Ticket updated successfully" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get Activity Logs for a specific ticket
+app.get('/api/tickets/:id/logs', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM activity_logs WHERE ticket_id = ? ORDER BY created_at DESC', [req.params.id]);
+        res.json(rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -149,6 +195,16 @@ app.get('/api/tickets/:id/comments', async (req, res) => {
             ORDER BY c.created_at ASC`, 
             [ticketId]
         );
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get all Admins/Techs for the assignment dropdown
+app.get('/api/admin/techs', verifyAdmin, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT id, name FROM users WHERE role = "Admin"');
         res.json(rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
